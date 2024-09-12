@@ -187,10 +187,16 @@ struct llm_bigram_spm {
     size_t size;
 };
 
-struct llm_tokenizer_spm {
+class llm_tokenizer {
+public:
+    virtual ~llm_tokenizer() = default;
+    virtual void tokenize(const std::string& text, std::vector<llama_vocab::id>& output) = 0;
+};
+
+struct llm_tokenizer_spm : public llm_tokenizer {
     llm_tokenizer_spm(const llama_vocab & vocab) : vocab(vocab) {}
 
-    void tokenize(const std::string & text, std::vector<llama_vocab::id> & output) {
+    void tokenize(const std::string & text, std::vector<llama_vocab::id> & output) override {
         // split string into utf8 chars
         int index = 0;
         size_t offs = 0;
@@ -352,7 +358,7 @@ struct llm_bigram_bpe {
     size_t size;
 };
 
-struct llm_tokenizer_bpe {
+struct llm_tokenizer_bpe : public llm_tokenizer {
     llm_tokenizer_bpe(const llama_vocab & vocab): vocab(vocab) {
         GGML_ASSERT(vocab.type == LLAMA_VOCAB_TYPE_BPE);
         switch (vocab.type_pre) {
@@ -499,7 +505,7 @@ struct llm_tokenizer_bpe {
         }
     }
 
-    void tokenize(const std::string & text, std::vector<llama_vocab::id> & output) {
+    void tokenize(const std::string & text, std::vector<llama_vocab::id> & output) override {
         int final_prev_index = -1;
 
         const auto word_collection = unicode_regex_split(text, regex_exprs);
@@ -646,10 +652,10 @@ private:
 // WPM tokenizer
 //
 
-struct llm_tokenizer_wpm {
+struct llm_tokenizer_wpm : public llm_tokenizer {
     llm_tokenizer_wpm(const llama_vocab & vocab): vocab(vocab) {}
 
-    void tokenize(const std::string & text, std::vector<llama_vocab::id> & output) const {
+    void tokenize(const std::string & text, std::vector<llama_vocab::id> & output) override {
         const auto & token_map = vocab.token_to_id;
 
         // normalize and split by whitespace
@@ -758,7 +764,7 @@ struct llm_tokenizer_wpm {
 // UGM tokenizer
 //
 
-struct llm_tokenizer_ugm {
+struct llm_tokenizer_ugm : public llm_tokenizer {
     llm_tokenizer_ugm(const llama_vocab & vocab) : vocab(vocab) {
         if (vocab.precompiled_charsmap.size() > 0) {
             size_t charsmap_offset = 0;
@@ -818,7 +824,7 @@ struct llm_tokenizer_ugm {
      * After processing the whole sequence we backtrack from the end to get
      * the best tokenization.
     */
-    void tokenize(const std::string & text, std::vector<llama_vocab::id> & output) {
+    void tokenize(const std::string & text, std::vector<llama_vocab::id> & output) override {
         // get current size of output (for reversal later)
         size_t output_size = output.size();
 
@@ -1155,7 +1161,7 @@ static std::vector<uint8_t> llama_unescape_rwkv_token(const std::string & escape
     return output;
 }
 
-struct llm_tokenizer_rwkv {
+struct llm_tokenizer_rwkv : public llm_tokenizer {
     llm_tokenizer_rwkv(const llama_vocab & vocab): vocab(vocab) {
         // RWKV supports arbitrary byte tokens, but the vocab struct only supports string tokens.
         // For now, we decode the vocab here into the lookup we'll use for tokenization.
@@ -1168,7 +1174,7 @@ struct llm_tokenizer_rwkv {
         }
     }
 
-    void tokenize(const std::string & text, std::vector<llama_vocab::id> & output) {
+    void tokenize(const std::string & text, std::vector<llama_vocab::id> & output) override {
         uint32_t position = 0;
 
         while (position < text.size()) {
